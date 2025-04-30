@@ -44,7 +44,13 @@ import (
 	"github.com/getsops/sops/v3/version"
 )
 
-var log *logrus.Logger
+var (
+	log *logrus.Logger
+
+	// Whether the config file warning was already shown to the user.
+	// Used and set by findConfigFile().
+	showedConfigFileWarning bool
+)
 
 func init() {
 	log = logging.NewLogger("CMD")
@@ -364,7 +370,7 @@ func main() {
 				if c.GlobalString("config") != "" {
 					configPath = c.GlobalString("config")
 				} else {
-					configPath, err = config.FindConfigFile(".")
+					configPath, err = findConfigFile()
 					if err != nil {
 						return common.NewExitError(err, codes.ErrorGeneric)
 					}
@@ -462,7 +468,7 @@ func main() {
 			Name:      "filestatus",
 			Usage:     "check the status of the file, returning encryption status",
 			ArgsUsage: `file`,
-			Flags:     []cli.Flag{
+			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "input-type",
 					Usage: "currently ini, json, yaml, dotenv and binary are supported. If not set, sops will use the file's extension to determine the type",
@@ -685,7 +691,7 @@ func main() {
 				if c.GlobalString("config") != "" {
 					configPath = c.GlobalString("config")
 				} else {
-					configPath, err = config.FindConfigFile(".")
+					configPath, err = findConfigFile()
 					if err != nil {
 						return common.NewExitError(err, codes.ErrorGeneric)
 					}
@@ -696,12 +702,12 @@ func main() {
 				failedCounter := 0
 				for _, path := range c.Args() {
 					err := updatekeys.UpdateKeys(updatekeys.Opts{
-						InputPath:   path,
-						GroupQuorum: c.Int("shamir-secret-sharing-threshold"),
-						KeyServices: keyservices(c),
-						Interactive: !c.Bool("yes"),
-						ConfigPath:  configPath,
-						InputType:   c.String("input-type"),
+						InputPath:       path,
+						ShamirThreshold: c.Int("shamir-secret-sharing-threshold"),
+						KeyServices:     keyservices(c),
+						Interactive:     !c.Bool("yes"),
+						ConfigPath:      configPath,
+						InputType:       c.String("input-type"),
 					})
 
 					if c.NArg() == 1 {
@@ -791,6 +797,11 @@ func main() {
 				fileNameOverride := c.String("filename-override")
 				if fileNameOverride == "" {
 					fileNameOverride = fileName
+				} else {
+					fileNameOverride, err = filepath.Abs(fileNameOverride)
+					if err != nil {
+						return toExitError(err)
+					}
 				}
 
 				inputStore, err := inputStore(c, fileNameOverride)
@@ -972,6 +983,11 @@ func main() {
 				fileNameOverride := c.String("filename-override")
 				if fileNameOverride == "" {
 					fileNameOverride = fileName
+				} else {
+					fileNameOverride, err = filepath.Abs(fileNameOverride)
+					if err != nil {
+						return toExitError(err)
+					}
 				}
 
 				inputStore, err := inputStore(c, fileNameOverride)
@@ -1138,6 +1154,11 @@ func main() {
 				fileNameOverride := c.String("filename-override")
 				if fileNameOverride == "" {
 					fileNameOverride = fileName
+				} else {
+					fileNameOverride, err = filepath.Abs(fileNameOverride)
+					if err != nil {
+						return toExitError(err)
+					}
 				}
 
 				inputStore, err := inputStore(c, fileNameOverride)
@@ -1568,6 +1589,10 @@ func main() {
 			Usage:  "do not check whether the current version is latest during --version",
 			EnvVar: "SOPS_DISABLE_VERSION_CHECK",
 		},
+		cli.BoolFlag{
+			Name:  "check-for-updates",
+			Usage: "do check whether the current version is latest during --version",
+		},
 		cli.StringFlag{
 			Name:   "kms, k",
 			Usage:  "comma separated list of KMS ARNs",
@@ -1703,8 +1728,8 @@ func main() {
 			Usage: "set the encrypted comment suffix. When specified, only keys that have comment matching the regex will be encrypted.",
 		},
 		cli.StringFlag{
-			Name:  "config",
-			Usage: "path to sops' config file. If set, sops will not search for the config file recursively.",
+			Name:   "config",
+			Usage:  "path to sops' config file. If set, sops will not search for the config file recursively.",
 			EnvVar: "SOPS_CONFIG",
 		},
 		cli.StringFlag{
@@ -1775,6 +1800,11 @@ func main() {
 		fileNameOverride := c.String("filename-override")
 		if fileNameOverride == "" {
 			fileNameOverride = fileName
+		} else {
+			fileNameOverride, err = filepath.Abs(fileNameOverride)
+			if err != nil {
+				return toExitError(err)
+			}
 		}
 
 		commandCount := 0
@@ -2150,7 +2180,7 @@ func keyservices(c *cli.Context) (svcs []keyservice.KeyServiceClient) {
 			"address",
 			fmt.Sprintf("%s://%s", url.Scheme, addr),
 		).Infof("Connecting to key service")
-		conn, err := grpc.Dial(addr, opts...)
+		conn, err := grpc.NewClient(addr, opts...)
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)
 		}
@@ -2159,11 +2189,21 @@ func keyservices(c *cli.Context) (svcs []keyservice.KeyServiceClient) {
 	return
 }
 
+// Wrapper of config.LookupConfigFile that takes care of handling the returned warning.
+func findConfigFile() (string, error) {
+	result, err := config.LookupConfigFile(".")
+	if len(result.Warning) > 0 && !showedConfigFileWarning {
+		showedConfigFileWarning = true
+		log.Warn(result.Warning)
+	}
+	return result.Path, err
+}
+
 func loadStoresConfig(context *cli.Context, path string) (*config.StoresConfig, error) {
 	configPath := context.GlobalString("config")
 	if configPath == "" {
-		// Ignore config not found errors returned from FindConfigFile since the config file is not mandatory
-		foundPath, err := config.FindConfigFile(".")
+		// Ignore config not found errors returned from findConfigFile since the config file is not mandatory
+		foundPath, err := findConfigFile()
 		if err != nil {
 			return config.NewStoresConfig(), nil
 		}
@@ -2283,7 +2323,7 @@ func keyGroups(c *cli.Context, file string) ([]sops.KeyGroup, error) {
 			if err != nil {
 				errMsg = fmt.Sprintf("%s: %s", errMsg, err)
 			}
-			return nil, fmt.Errorf(errMsg)
+			return nil, fmt.Errorf("%s", errMsg)
 		}
 		return conf.KeyGroups, err
 	}
@@ -2298,14 +2338,14 @@ func keyGroups(c *cli.Context, file string) ([]sops.KeyGroup, error) {
 	return []sops.KeyGroup{group}, nil
 }
 
-// loadConfig will look for an existing config file, either provided through the command line, or using config.FindConfigFile.
+// loadConfig will look for an existing config file, either provided through the command line, or using findConfigFile
 // Since a config file is not required, this function does not error when one is not found, and instead returns a nil config pointer
 func loadConfig(c *cli.Context, file string, kmsEncryptionContext map[string]*string) (*config.Config, error) {
 	var err error
 	configPath := c.GlobalString("config")
 	if configPath == "" {
-		// Ignore config not found errors returned from FindConfigFile since the config file is not mandatory
-		configPath, err = config.FindConfigFile(".")
+		// Ignore config not found errors returned from findConfigFile since the config file is not mandatory
+		configPath, err = findConfigFile()
 		if err != nil {
 			// If we can't find a config file, but we were not explicitly requested to, assume it does not exist
 			return nil, nil

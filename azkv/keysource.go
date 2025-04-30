@@ -23,6 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	azidentitycache "github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys"
+	"github.com/pkg/browser"
 	"github.com/sirupsen/logrus"
 
 	"github.com/getsops/sops/v3/logging"
@@ -90,7 +91,7 @@ func NewMasterKeyFromURL(url string) (*MasterKey, error) {
 	url = strings.TrimSpace(url)
 	re := regexp.MustCompile("^(https://[^/]+)/keys/([^/]+)/([^/]+)$")
 	parts := re.FindStringSubmatch(url)
-	if parts == nil || len(parts) < 3 {
+	if len(parts) < 3 {
 		return nil, fmt.Errorf("could not parse %q into a valid Azure Key Vault MasterKey", url)
 	}
 	return NewMasterKey(parts[1], parts[2], parts[3]), nil
@@ -337,10 +338,16 @@ func cacheTokenCredential(cachePath string, tokenCredentialFn func(cache azident
 }
 
 func cachedInteractiveBrowserCredentials() (azcore.TokenCredential, error) {
+	// The default behaviour of `browser` which `azidentity` is using for the interactive browser authentication method is to write anything the browser prints to stdout to the stdout of the program running it.
+	// This is not desired since on the initial authentication or when refreshing the cache it would pollute the output of sops.
+	// To fix this behaviour we redirect the browser stdout -> stderr so any pertinent information written by the browser is not completely hidden from the user but it doesn't mess up the sops output.
+	browser.Stdout = os.Stderr
+
 	cacheDir, err := sopsCacheDir()
 	if err != nil {
 		return nil, err
 	}
+
 	return cacheTokenCredential(
 		filepath.Join(cacheDir, cachedBrowserAuthRecordFileName),
 		func(cache azidentity.Cache, record azidentity.AuthenticationRecord) (CachableTokenCredential, error) {
@@ -364,6 +371,12 @@ func cachedDeviceCodeCredentials() (azcore.TokenCredential, error) {
 			return azidentity.NewDeviceCodeCredential(&azidentity.DeviceCodeCredentialOptions{
 				AuthenticationRecord: record,
 				Cache:                cache,
+				// Print the device code authentication information to stderr so we don't pollute the output of sops.
+				UserPrompt: func(ctx context.Context, dc azidentity.DeviceCodeMessage) error {
+					_, err := fmt.Fprintln(os.Stderr, dc.Message)
+					return err
+
+				},
 			})
 		},
 	)

@@ -12,7 +12,7 @@ import (
 )
 
 // Version represents the value of the current semantic version.
-var Version = "3.9.4"
+var Version = "3.10.1"
 
 // PrintVersion prints the current version of sops. If the flag
 // `--disable-version-check` is set or if the environment variable
@@ -29,7 +29,7 @@ func PrintVersion(c *cli.Context) {
 
 	out.WriteString(fmt.Sprintf("%s %s", c.App.Name, c.App.Version))
 
-	if c.Bool("disable-version-check") {
+	if c.Bool("disable-version-check") && !c.Bool("check-for-updates") {
 		out.WriteString("\n")
 	} else {
 		upstreamVersion, upstreamURL, err := RetrieveLatestReleaseVersion()
@@ -46,6 +46,12 @@ func PrintVersion(c *cli.Context) {
 					out.WriteString(" (latest)\n")
 				}
 			}
+		}
+		if !c.Bool("check-for-updates") {
+			out.WriteString(
+				"\n[warning] Note that in a future version, sops will no longer check whether the current version is the latest when asking for sops' version." +
+					" If you want to explicitly check for the latest version, add the `--check-for-updates` option to `sops --version`." +
+					" This will hide this deprecation warning and will always check, even if the default behavior changes in the future.\n")
 		}
 	}
 	fmt.Fprintf(c.App.Writer, "%s", out.String())

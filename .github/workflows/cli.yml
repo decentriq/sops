@@ -15,8 +15,8 @@ permissions:
 jobs:
   build:
     name: Build and test ${{ matrix.os }} ${{ matrix.arch }} ${{ matrix.go-version }}
-    #runs-on: 'ubuntu-latest'
-    runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
+    runs-on: 'ubuntu-latest'
+    #runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
     strategy:
       matrix:
         os: [darwin]
@@ -31,10 +31,10 @@ jobs:
       VAULT_TOKEN: "root"
       VAULT_ADDR: "http://127.0.0.1:8200"
     steps:
-      - run: |
-          brew install docker
-          brew install colima
-          colima start
+      #- run: |
+      #    brew install docker
+      #    brew install colima
+      #    colima start
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
@@ -52,6 +52,11 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Set up MacOS Cross Compiler
+        uses: Timmmm/setup-osxcross@v2
+        with:
+          osx-version: "12.3"
+
 
       - name: Vendor Go Modules
         run: make vendor

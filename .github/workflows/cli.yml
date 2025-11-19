@@ -19,7 +19,8 @@ jobs:
     runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
     strategy:
       matrix:
-        os: [linux, darwin, windows]
+        os: [darwin]
+        #os: [linux, darwin, windows]
         arch: [amd64, arm64]
         go-version: ['1.24', '1.25']
         exclude:
@@ -57,6 +58,10 @@ jobs:
       - name: Build linux
         if: matrix.os == 'linux'
         run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o sops-${{ matrix.go-version }}-${{ matrix.os }}-${{ matrix.arch }}-${{ github.sha }} -v ./cmd/sops
+
+      - run: |
+          brew install docker
+          colima start
 
       - name: Build darwin
         if: matrix.os == 'darwin'

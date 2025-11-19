@@ -72,7 +72,7 @@ jobs:
 
       - name: Build darwin
         if: matrix.os == 'darwin'
-        run: CC=clang CGO_ENABLED=1 GOOS=${{ matrix.os }} go build -o sops-${{ matrix.go-version }}-${{ matrix.os }}-${{ github.sha }} -v ./cmd/sops
+        run: CGO_ENABLED=1 GOOS=${{ matrix.os }} go build -o sops-${{ matrix.go-version }}-${{ matrix.os }}-${{ github.sha }} -v ./cmd/sops
 
       - name: Build windows
         if: matrix.os == 'windows'

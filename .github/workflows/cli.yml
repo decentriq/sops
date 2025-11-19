@@ -53,11 +53,6 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up MacOS Cross Compiler
-        uses: Timmmm/setup-osxcross@v2
-        with:
-          osx-version: "12.3"
-
 
       - name: Vendor Go Modules
         run: make vendor

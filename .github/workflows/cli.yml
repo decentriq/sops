@@ -18,7 +18,7 @@ jobs:
     runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
     strategy:
       matrix:
-        os: [linux, darwin, windows]
+        os: [linux, windows]
         arch: [amd64, arm64]
         go-version: ['1.24', '1.25']
         exclude:

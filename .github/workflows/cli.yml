@@ -15,7 +15,8 @@ permissions:
 jobs:
   build:
     name: Build and test ${{ matrix.os }} ${{ matrix.arch }} ${{ matrix.go-version }}
-    runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
+    runs-on: 'ubuntu-latest'
+    #runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
     strategy:
       matrix:
         os: [linux, windows]
@@ -59,7 +60,7 @@ jobs:
 
       - name: Build darwin
         if: matrix.os == 'darwin'
-        run: CGO_ENABLED=1 GOOS=${{ matrix.os }} go build -o sops-${{ matrix.go-version }}-${{ matrix.os }}-${{ github.sha }} -v ./cmd/sops
+        run: CC=clang CGO_ENABLED=1 GOOS=${{ matrix.os }} go build -o sops-${{ matrix.go-version }}-${{ matrix.os }}-${{ github.sha }} -v ./cmd/sops
 
       - name: Build windows
         if: matrix.os == 'windows'

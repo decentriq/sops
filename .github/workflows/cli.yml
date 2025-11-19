@@ -31,6 +31,10 @@ jobs:
       VAULT_TOKEN: "root"
       VAULT_ADDR: "http://127.0.0.1:8200"
     steps:
+      - run: |
+          brew install docker
+          brew install colima
+          colima start
       - name: Set up Go ${{ matrix.go-version }}
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
@@ -59,9 +63,6 @@ jobs:
         if: matrix.os == 'linux'
         run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o sops-${{ matrix.go-version }}-${{ matrix.os }}-${{ matrix.arch }}-${{ github.sha }} -v ./cmd/sops
 
-      - run: |
-          brew install docker
-          docker start
 
       - name: Build darwin
         if: matrix.os == 'darwin'

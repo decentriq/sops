@@ -21,7 +21,8 @@ jobs:
       matrix:
         os: [darwin]
         #os: [linux, darwin, windows]
-        arch: [amd64, arm64]
+        #arch: [amd64, arm64]
+        arch: [arm64]
         go-version: ['1.24', '1.25']
         exclude:
           - os: windows

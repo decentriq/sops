@@ -15,8 +15,8 @@ permissions:
 jobs:
   build:
     name: Build and test ${{ matrix.os }} ${{ matrix.arch }} ${{ matrix.go-version }}
-    runs-on: 'ubuntu-latest'
-    #runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
+    #runs-on: 'ubuntu-latest'
+    runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
     strategy:
       matrix:
         os: [linux, darwin, windows]

@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -320,7 +321,22 @@ func (key *MasterKey) TypeToIdentifier() string {
 // azidentity.NewDefaultAzureCredential.
 func (key *MasterKey) getTokenCredential() (azcore.TokenCredential, error) {
 	if key.tokenCredential == nil {
-		return azidentity.NewDefaultAzureCredential(nil)
+		authMethod := strings.ToLower(os.Getenv(SopsAzureAuthMethodEnv))
+		switch authMethod {
+		case "cached-browser":
+			return cachedInteractiveBrowserCredentials()
+		case "cached-device-code":
+			return cachedDeviceCodeCredentials()
+		case "azure-cli":
+			return azidentity.NewAzureCLICredential(nil)
+		case "msi":
+			return azidentity.NewManagedIdentityCredential(nil)
+		// If "DEFAULT" or not explicitly specified then use the default authentication chain.
+		case "", "default":
+			return azidentity.NewDefaultAzureCredential(nil)
+		default:
+			return nil, fmt.Errorf("Value `%s` is unsupported for environment variable `%s`, to resolve this either leave it unset or use one of `default`/`msi`/`azure-cli`/`cached-browser`/`cached-device-code`", authMethod, SopsAzureAuthMethodEnv)
+		}
 	}
 	return key.tokenCredential, nil
 }
